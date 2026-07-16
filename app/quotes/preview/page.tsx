@@ -9,14 +9,23 @@ export default async function QuotePreviewPage() {
   } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("users")
-    .select("companies ( name )")
+    .select("name, companies ( name, postal_code, address, phone )")
     .eq("id", user!.id)
     .maybeSingle();
-  const companyName = (profile as unknown as { companies: { name: string } | null })?.companies?.name ?? "";
+  const company = (profile as unknown as {
+    companies: { name: string; postal_code: string | null; address: string | null; phone: string | null } | null;
+  })?.companies;
+  const personInCharge = (profile as unknown as { name: string } | null)?.name ?? "";
 
   return (
     <AppShell>
-      <PreviewView companyName={companyName} />
+      <PreviewView
+        companyName={company?.name ?? ""}
+        companyPostalCode={company?.postal_code ?? null}
+        companyAddress={company?.address ?? null}
+        companyPhone={company?.phone ?? null}
+        personInCharge={personInCharge}
+      />
     </AppShell>
   );
 }

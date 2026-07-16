@@ -24,8 +24,24 @@ body {
   color: var(--foreground);
 }
 
+/* Orientation is chosen at runtime: the print container gets one of these
+   classes, which selects the matching named @page rule below. */
+@page portrait {
+  size: A4 portrait;
+  margin: 12mm;
+}
+@page landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
 @page {
-  margin: 14mm;
+  margin: 12mm;
+}
+.orient-portrait {
+  page: portrait;
+}
+.orient-landscape {
+  page: landscape;
 }
 
 @media print {

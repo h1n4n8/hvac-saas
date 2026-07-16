@@ -172,9 +172,8 @@ export default function QuoteForm() {
 
   const allItems = categories.flatMap((c) => c.items);
   const subtotal = allItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-  const discountedSubtotal = Math.max(0, subtotal - discount);
-  const taxAmount = Math.floor(discountedSubtotal * 0.1);
-  const total = discountedSubtotal + taxAmount;
+  // 税抜: 合計 = 小計 − 出精値引き(消費税は含めない。特記事項に明記)。
+  const total = Math.max(0, subtotal - discount);
 
   const handlePreview = () => {
     setError("");
@@ -187,16 +186,18 @@ export default function QuoteForm() {
     const filledItems = allItems.filter((i) => i.description.trim() !== "");
     if (filledItems.length === 0) return setError("品目を1つ以上入力してください");
 
+    const quoteNo = `EST-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const draft = {
+      quoteNo,
       projectName,
       customerName,
       customerEmail,
       date,
       items: filledItems.map((i) => ({ description: i.description, category: "", quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice })),
       notes,
-      subtotal: discountedSubtotal,
+      subtotal,
       discount,
-      taxAmount,
+      taxAmount: 0,
       total,
       aiGenerated: usedAi,
     };
@@ -469,14 +470,11 @@ export default function QuoteForm() {
                   />
                 </div>
               </div>
-              <div className="flex justify-between text-slate-500">
-                <span>消費税(10%)</span>
-                <span>¥{taxAmount.toLocaleString()}</span>
-              </div>
               <div className="flex justify-between font-bold text-slate-800 text-base pt-2 border-t-2 border-slate-800">
-                <span>合計金額</span>
+                <span>合計金額(税抜)</span>
                 <span>¥{total.toLocaleString()}</span>
               </div>
+              <p className="text-[11px] text-slate-400 text-right">※消費税は含みません(税抜)</p>
             </div>
           </section>
 
