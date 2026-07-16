@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
+import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, ANTHROPIC_MODEL } from "@/lib/anthropic";
 
 export const runtime = "nodejs";
 
-// Decided-by-default column keywords. If the header row doesn't clearly
-// match any of these, we still send the raw rows to the AI and mark the
-// result as needing manual review instead of guessing silently.
-const NAME_HINTS = ["品目", "名称", "工事内容", "項目", "内容"];
-const QTY_HINTS = ["数量", "個数"];
-const UNIT_HINTS = ["単位"];
-const PRICE_HINTS = ["単価", "金額", "価格"];
+// Guard rails: onboarding uploads are a handful of past quotes, not an
+// archive. Keep the request comfortably under the Anthropic API size limit.
+const MAX_FILES = 10;
+const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20MB of raw file data
 
 interface ParsedItem {
   category: string;
@@ -19,8 +17,24 @@ interface ParsedItem {
   unitPrice: number;
 }
 
-function guessColumn(header: string[], hints: string[]): number {
-  return header.findIndex((cell) => hints.some((hint) => (cell ?? "").toString().includes(hint)));
+interface ProcessedFile {
+  name: string;
+  ok: boolean;
+  note?: string;
+}
+
+function extNameOf(file: File): string {
+  const dot = file.name.lastIndexOf(".");
+  return dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : "";
+}
+
+// Excel -> a compact text table the model can read. Only the first sheet and
+// the first 200 rows are used (past quotes are small).
+function excelToText(buffer: Buffer): string {
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as unknown[][];
+  return JSON.stringify(rows.slice(0, 200));
 }
 
 export async function POST(request: Request) {
@@ -33,106 +47,122 @@ export async function POST(request: Request) {
   }
 
   const formData = await request.formData();
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "ファイルが見つかりません。" }, { status: 400 });
-  }
-  const mappingOverrideRaw = formData.get("mappingOverride");
-  const mappingOverride = typeof mappingOverrideRaw === "string" ? JSON.parse(mappingOverrideRaw) : null;
+  // Accept both the new multi-file field ("files") and, for safety, a single
+  // legacy "file" field.
+  const rawFiles = [...formData.getAll("files"), ...formData.getAll("file")];
+  const files = rawFiles.filter((f): f is File => f instanceof File);
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  let rows: unknown[][];
-  try {
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-  } catch {
+  if (files.length === 0) {
+    return NextResponse.json({ error: "ファイルが選択されていません。" }, { status: 400 });
+  }
+  if (files.length > MAX_FILES) {
     return NextResponse.json(
-      { error: "Excelファイルの読み込みに失敗しました。形式をご確認ください。" },
+      { error: `一度にアップロードできるのは${MAX_FILES}ファイルまでです。` },
       { status: 400 }
     );
   }
 
-  if (rows.length < 2) {
-    return NextResponse.json({ error: "見積データの行が見つかりませんでした。" }, { status: 400 });
+  const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+  if (totalBytes > MAX_TOTAL_BYTES) {
+    return NextResponse.json(
+      { error: "ファイルの合計サイズが大きすぎます（合計20MBまで）。数を減らしてお試しください。" },
+      { status: 400 }
+    );
   }
 
-  const header = rows[0].map((c) => String(c));
-  const guessedMapping = {
-    nameColumn: guessColumn(header, NAME_HINTS),
-    quantityColumn: guessColumn(header, QTY_HINTS),
-    unitColumn: guessColumn(header, UNIT_HINTS),
-    priceColumn: guessColumn(header, PRICE_HINTS),
-  };
-  const mappingIsConfident = mappingOverride
-    ? true
-    : guessedMapping.nameColumn >= 0 && guessedMapping.priceColumn >= 0;
+  // Build a single Claude message that carries every file: Excel sheets as
+  // text tables, PDFs as native document blocks. Claude reads them all and
+  // returns one merged, de-duplicated item list.
+  const content: Anthropic.ContentBlockParam[] = [];
+  const processedFiles: ProcessedFile[] = [];
 
-  // Cap the payload sent to the model; onboarding files are typically a
-  // handful of past quotes, not a full accounting export.
-  const previewRows = rows.slice(0, 200);
+  content.push({
+    type: "text",
+    text: `あなたは空調・設備工事会社の過去見積もり（ExcelやPDF）を解析するアシスタントです。
+これから、アップロードされた1つ以上の過去見積もりファイルを渡します。各ファイルは Excel をテキスト化した表、または PDF そのものです。
+すべてのファイルに目を通し、見積品目を抽出してください。`,
+  });
 
-  const mappingInstruction = mappingOverride
-    ? `列マッピングはユーザーが以下の通り確定済みです。この通りに列を解釈してください(0始まりのインデックス、-1は該当なし): ${JSON.stringify(mappingOverride)}`
-    : `列マッピングの推測(0始まりのインデックス、-1は未検出): ${JSON.stringify(guessedMapping)}`;
+  for (const file of files) {
+    const ext = extNameOf(file);
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      if (ext === "pdf" || file.type === "application/pdf") {
+        content.push({ type: "text", text: `--- ファイル: ${file.name} (PDF) ---` });
+        content.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: buffer.toString("base64") },
+        });
+        processedFiles.push({ name: file.name, ok: true });
+      } else if (ext === "xlsx" || ext === "xls") {
+        const text = excelToText(buffer);
+        content.push({
+          type: "text",
+          text: `--- ファイル: ${file.name} (Excel、行の配列) ---\n${text}`,
+        });
+        processedFiles.push({ name: file.name, ok: true });
+      } else {
+        processedFiles.push({ name: file.name, ok: false, note: "対応していない形式（Excel/PDFのみ）" });
+      }
+    } catch {
+      processedFiles.push({ name: file.name, ok: false, note: "ファイルの読み込みに失敗しました" });
+    }
+  }
 
-  const prompt = `あなたは空調・設備工事会社の過去見積もりExcelを解析するアシスタントです。
-以下はアップロードされたExcelの生データ(行の配列、1行目はヘッダーの可能性があります)です。
+  if (!processedFiles.some((f) => f.ok)) {
+    return NextResponse.json(
+      {
+        error: "読み取れるファイルがありませんでした（対応形式は Excel(.xlsx/.xls) と PDF です）。",
+        processedFiles,
+      },
+      { status: 400 }
+    );
+  }
 
-${mappingInstruction}
+  content.push({
+    type: "text",
+    text: `タスク:
+1. すべてのファイルから見積品目を特定し、各品目について「category(工事カテゴリの推定。例: 空調機据付工事/冷媒配管工事/ダクト工事/電気工事/計装工事/ドレン工事/試運転調整/経費・その他 のいずれかに近いもの)」「name(品目名)」「unit(単位。不明なら"式")」「unitPrice(単価。数値、円。税抜)」を抽出してください。
+2. 小計・消費税・合計・値引きなどの集計行は品目として抽出しないでください。
+3. 複数のファイル・見積もりに同じ品目が登場する場合は1つにまとめ、代表的（直近または最頻）な単価を採用してください。
+4. 全体として読み取りの確信が持てない（表の意味が曖昧、単価が数値として読めない等）場合は confidence を "low" にしてください。
 
-生データ:
-${JSON.stringify(previewRows)}
-
-タスク:
-1. 実際の見積品目行を特定し、各行から「category(工事カテゴリの推定。例: 空調機据付工事/冷媒配管工事/ダクト工事/電気工事/計装工事/ドレン工事/試運転調整/経費・その他のいずれかに近いもの)」「name(品目名)」「unit(単位。不明なら"式")」「unitPrice(単価。数値、円)」を抽出してください。
-2. 小計・消費税・合計などの集計行は品目として抽出しないでください。
-3. 同じ品目が複数見積もりに登場する場合は1つにまとめ、直近または一般的な単価を採用してください。
-4. 列の意味が推測しづらい、または数値であるべき単価列に非数値が多い場合は confidence を "low" にしてください。
-
-次のJSON形式のみで出力してください(説明文やコードブロック記法は不要です):
+次のJSON形式のみで出力してください(説明文やコードブロック記法は不要):
 {
   "confidence": "high" | "low",
-  "mapping": { "nameColumn": number, "quantityColumn": number, "unitColumn": number, "priceColumn": number },
   "items": [ { "category": string, "name": string, "unit": string, "unitPrice": number } ]
-}`;
+}`,
+  });
 
   let aiText: string;
   try {
     const response = await anthropic.messages.create({
       model: ANTHROPIC_MODEL,
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }],
+      max_tokens: 8192,
+      messages: [{ role: "user", content }],
     });
     const textBlock = response.content.find((b) => b.type === "text");
     aiText = textBlock && textBlock.type === "text" ? textBlock.text : "";
   } catch (err) {
     return NextResponse.json(
-      { error: `AI解析に失敗しました: ${err instanceof Error ? err.message : "不明なエラー"}` },
+      { error: `AI解析に失敗しました: ${err instanceof Error ? err.message : "不明なエラー"}`, processedFiles },
       { status: 502 }
     );
   }
 
-  let parsed: { confidence: "high" | "low"; mapping: typeof guessedMapping; items: ParsedItem[] };
+  let parsed: { confidence: "high" | "low"; items: ParsedItem[] };
   try {
     const jsonMatch = aiText.match(/\{[\s\S]*\}/);
     parsed = JSON.parse(jsonMatch ? jsonMatch[0] : aiText);
   } catch {
     return NextResponse.json(
-      { error: "AIの応答を解析できませんでした。もう一度お試しください。" },
+      { error: "AIの応答を解析できませんでした。もう一度お試しください。", processedFiles },
       { status: 502 }
     );
   }
 
-  const needsReview = mappingOverride
-    ? parsed.items.length === 0
-    : !mappingIsConfident || parsed.confidence === "low" || parsed.items.length === 0;
+  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  const needsReview = parsed.confidence === "low" || items.length === 0;
 
-  return NextResponse.json({
-    needsReview,
-    mapping: parsed.mapping ?? guessedMapping,
-    items: parsed.items ?? [],
-    headerPreview: header,
-    rawPreview: previewRows.slice(0, 10),
-  });
+  return NextResponse.json({ needsReview, items, processedFiles });
 }
