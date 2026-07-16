@@ -54,6 +54,7 @@ export default function QuoteForm() {
   >(null);
   const [aiSelected, setAiSelected] = useState<Set<number>>(new Set());
   const [aiNote, setAiNote] = useState<string | null>(null);
+  const [usedAi, setUsedAi] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -147,6 +148,7 @@ export default function QuoteForm() {
   const applyAiSuggestions = () => {
     if (!aiSuggestions) return;
     const chosen = aiSuggestions.filter((_, i) => aiSelected.has(i));
+    if (chosen.length > 0) setUsedAi(true);
     setCategories((prev) => {
       const next = [...prev];
       for (const s of chosen) {
@@ -178,21 +180,25 @@ export default function QuoteForm() {
     setError("");
     if (!projectName) return setError("工事名を入力してください");
     if (!customerName) return setError("顧客名を入力してください");
-    if (categories.length === 0) return setError("工事項目を1つ以上追加してください");
-    if (allItems.some((i) => !i.description)) return setError("品目名を入力してください");
+
+    // Blank rows (e.g. the empty free-input row auto-added with each category)
+    // are ignored so the user doesn't have to fill or delete them just to
+    // reach the preview. Totals already ignore blanks (unit price 0).
+    const filledItems = allItems.filter((i) => i.description.trim() !== "");
+    if (filledItems.length === 0) return setError("品目を1つ以上入力してください");
 
     const draft = {
       projectName,
       customerName,
       customerEmail,
       date,
-      items: allItems.map((i) => ({ description: i.description, category: "", quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice })),
+      items: filledItems.map((i) => ({ description: i.description, category: "", quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice })),
       notes,
       subtotal: discountedSubtotal,
       discount,
       taxAmount,
       total,
-      aiGenerated: aiSuggestions !== null || categories.some((c) => c.items.some((i) => i.description)),
+      aiGenerated: usedAi,
     };
     sessionStorage.setItem("quote_draft", JSON.stringify(draft));
     router.push("/quotes/preview");
