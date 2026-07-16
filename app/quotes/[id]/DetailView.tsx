@@ -19,6 +19,7 @@ const statusOptions: QuoteStatus[] = ["作成中", "未確定", "確定"];
 export default function DetailView({
   quote: initialQuote,
   companyName,
+  companyLogoUrl,
   companyPostalCode,
   companyAddress,
   companyPhone,
@@ -26,6 +27,7 @@ export default function DetailView({
 }: {
   quote: Quote;
   companyName: string;
+  companyLogoUrl: string | null;
   companyPostalCode: string | null;
   companyAddress: string | null;
   companyPhone: string | null;
@@ -90,6 +92,7 @@ export default function DetailView({
       <div className="quote-paper bg-white rounded-2xl border border-slate-100 shadow-sm p-8 overflow-x-auto">
         <QuoteDocument
           companyName={companyName}
+          companyLogoUrl={companyLogoUrl}
           companyPostalCode={companyPostalCode}
           companyAddress={companyAddress}
           companyPhone={companyPhone}

@@ -1,10 +1,17 @@
 // Printable quote sheet in the traditional Japanese 御見積書 layout
-// (landscape, ruled grid). Shared by the preview and the saved-quote detail
-// view so both look identical. Amounts are tax-excluded to match the standard
-// 設備工事 quote format (see 特記事項).
+// (ruled grid; portrait or landscape). Shared by the preview and the saved-
+// quote detail view so both look identical. Amounts are tax-excluded to match
+// the standard 設備工事 quote format (see 特記事項).
+//
+// Numbering is per work category (グループ): each category gets one 項目
+// number and its line items are listed beneath without their own numbers.
+// Items with no category are shown as their own numbered rows.
+
+import type { ReactNode } from "react";
 
 export interface QuoteDocItem {
   description: string;
+  category?: string;
   quantity: number;
   unit: string;
   unitPrice: number;
@@ -12,6 +19,7 @@ export interface QuoteDocItem {
 
 export interface QuoteDocumentProps {
   companyName: string;
+  companyLogoUrl?: string | null;
   companyPostalCode?: string | null;
   companyAddress?: string | null;
   companyPhone?: string | null;
@@ -45,9 +53,31 @@ function yen(n: number): string {
   return `¥${n.toLocaleString()}`;
 }
 
+interface Group {
+  category: string; // "" = standalone item(s), rendered as numbered rows
+  items: QuoteDocItem[];
+}
+
+// Merge consecutive items that share a non-empty category into one group.
+// Empty-category items each become their own single-item group.
+function groupItems(items: QuoteDocItem[]): Group[] {
+  const groups: Group[] = [];
+  for (const it of items) {
+    const cat = (it.category ?? "").trim();
+    const last = groups[groups.length - 1];
+    if (cat && last && last.category === cat) {
+      last.items.push(it);
+    } else {
+      groups.push({ category: cat, items: [it] });
+    }
+  }
+  return groups;
+}
+
 export default function QuoteDocument(props: QuoteDocumentProps) {
   const {
     companyName,
+    companyLogoUrl,
     companyPostalCode,
     companyAddress,
     companyPhone,
@@ -66,11 +96,84 @@ export default function QuoteDocument(props: QuoteDocumentProps) {
   const rawSubtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const total = rawSubtotal - discount;
 
-  // Item rows + optional discount row, padded with blank rows to MIN_ROWS.
-  const bodyRowCount = items.length + (discount > 0 ? 1 : 0);
-  const fillerCount = Math.max(0, MIN_ROWS - bodyRowCount);
-
   const cell = "border border-slate-500 px-2 py-1";
+  const groups = groupItems(items);
+
+  // Build the body rows, numbering by group, and count them for the filler.
+  const rows: ReactNode[] = [];
+  let n = 0;
+  groups.forEach((g, gi) => {
+    n += 1;
+    if (g.category) {
+      const groupTotal = g.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+      // Category header row (numbered, category name, group subtotal).
+      rows.push(
+        <tr key={`g${gi}`} className="bg-slate-50/70">
+          <td className={`${cell} text-center align-top`}>{n}</td>
+          <td className={`${cell} font-semibold`}>{g.category}</td>
+          <td className={`${cell} text-right`} />
+          <td className={`${cell} text-center`} />
+          <td className={`${cell} text-right`} />
+          <td className={`${cell} text-right font-semibold`}>{yen(groupTotal)}</td>
+        </tr>
+      );
+      // Detail rows (no number, indented name).
+      g.items.forEach((item, ii) => {
+        rows.push(
+          <tr key={`g${gi}i${ii}`}>
+            <td className={`${cell} text-center`} />
+            <td className={cell} style={{ paddingLeft: "1.75rem" }}>
+              {item.description}
+            </td>
+            <td className={`${cell} text-right`}>{qty(item.quantity)}</td>
+            <td className={`${cell} text-center`}>{item.unit || "式"}</td>
+            <td className={`${cell} text-right`}>{yen(item.unitPrice)}</td>
+            <td className={`${cell} text-right`}>{yen(item.quantity * item.unitPrice)}</td>
+          </tr>
+        );
+      });
+    } else {
+      // Standalone item (no category): a single numbered row.
+      const item = g.items[0];
+      rows.push(
+        <tr key={`s${gi}`}>
+          <td className={`${cell} text-center`}>{n}</td>
+          <td className={cell}>{item.description}</td>
+          <td className={`${cell} text-right`}>{qty(item.quantity)}</td>
+          <td className={`${cell} text-center`}>{item.unit || "式"}</td>
+          <td className={`${cell} text-right`}>{yen(item.unitPrice)}</td>
+          <td className={`${cell} text-right`}>{yen(item.quantity * item.unitPrice)}</td>
+        </tr>
+      );
+    }
+  });
+
+  if (discount > 0) {
+    rows.push(
+      <tr key="discount" className="text-red-600">
+        <td className={`${cell} text-center`} />
+        <td className={cell}>［出精値引き］</td>
+        <td className={`${cell} text-right`} />
+        <td className={`${cell} text-center`} />
+        <td className={`${cell} text-right`} />
+        <td className={`${cell} text-right`}>¥▲ {discount.toLocaleString()}</td>
+      </tr>
+    );
+  }
+
+  const fillerCount = Math.max(0, MIN_ROWS - rows.length);
+  for (let i = 0; i < fillerCount; i++) {
+    rows.push(
+      <tr key={`f${i}`}>
+        <td className={`${cell} text-center`}>&nbsp;</td>
+        <td className={cell} />
+        <td className={cell} />
+        <td className={cell} />
+        <td className={cell} />
+        <td className={cell} />
+      </tr>
+    );
+  }
 
   return (
     <div className="quote-doc text-slate-900 mx-auto" style={{ maxWidth: "1000px" }}>
@@ -105,6 +208,14 @@ export default function QuoteDocument(props: QuoteDocumentProps) {
 
         <div className="w-[42%] flex-shrink-0">
           <div className="text-right text-xs leading-5 mb-2">
+            {companyLogoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={companyLogoUrl}
+                alt="会社ロゴ"
+                style={{ maxHeight: "60px", maxWidth: "220px", marginLeft: "auto", marginBottom: "6px" }}
+              />
+            )}
             <p className="font-bold text-sm">{companyName}</p>
             {(companyPostalCode || companyAddress) && (
               <p>
@@ -153,38 +264,7 @@ export default function QuoteDocument(props: QuoteDocumentProps) {
             <th className={`${cell} font-medium`}>金　額</th>
           </tr>
         </thead>
-        <tbody>
-          {items.map((item, i) => (
-            <tr key={i}>
-              <td className={`${cell} text-center`}>{i + 1}</td>
-              <td className={cell}>{item.description}</td>
-              <td className={`${cell} text-right`}>{qty(item.quantity)}</td>
-              <td className={`${cell} text-center`}>{item.unit || "式"}</td>
-              <td className={`${cell} text-right`}>{yen(item.unitPrice)}</td>
-              <td className={`${cell} text-right`}>{yen(item.quantity * item.unitPrice)}</td>
-            </tr>
-          ))}
-          {discount > 0 && (
-            <tr className="text-red-600">
-              <td className={`${cell} text-center`} />
-              <td className={cell}>［出精値引き］</td>
-              <td className={`${cell} text-right`} />
-              <td className={`${cell} text-center`} />
-              <td className={`${cell} text-right`} />
-              <td className={`${cell} text-right`}>¥▲ {discount.toLocaleString()}</td>
-            </tr>
-          )}
-          {Array.from({ length: fillerCount }).map((_, i) => (
-            <tr key={`f${i}`}>
-              <td className={`${cell} text-center`}>&nbsp;</td>
-              <td className={cell} />
-              <td className={cell} />
-              <td className={cell} />
-              <td className={cell} />
-              <td className={cell} />
-            </tr>
-          ))}
-        </tbody>
+        <tbody>{rows}</tbody>
       </table>
 
       {/* 特記事項 */}

@@ -12,6 +12,7 @@ export interface Company {
   postal_code: string | null;
   address: string | null;
   phone: string | null;
+  logo_url: string | null;
   plan_status: "free" | "trial" | "paid" | "suspended";
   created_at: string;
 }

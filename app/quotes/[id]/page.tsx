@@ -13,7 +13,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
 
   const { data: company } = await supabase
     .from("companies")
-    .select("name, postal_code, address, phone")
+    .select("name, postal_code, address, phone, logo_url")
     .eq("id", quote.company_id)
     .maybeSingle();
 
@@ -28,6 +28,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
       <DetailView
         quote={quote as Quote}
         companyName={company?.name ?? ""}
+        companyLogoUrl={company?.logo_url ?? null}
         companyPostalCode={company?.postal_code ?? null}
         companyAddress={company?.address ?? null}
         companyPhone={company?.phone ?? null}

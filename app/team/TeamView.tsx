@@ -1,8 +1,39 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Ticket, Copy, Loader2, Check, X, UserCheck, Clock } from "lucide-react";
+import { Ticket, Copy, Loader2, Check, X, UserCheck, Clock, Image as ImageIcon, Trash2 } from "lucide-react";
 import type { PendingMember } from "@/lib/types";
+
+// Read an image file and downscale it to a small PNG data URL so the stored
+// logo stays tiny (fits comfortably in a DB text column).
+function fileToLogoDataUrl(file: File, maxW = 260, maxH = 120): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("ファイルを読み込めませんでした"));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("画像を読み込めませんでした"));
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width, maxH / img.height);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("画像の変換に失敗しました"));
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL("image/png"));
+        } catch {
+          reject(new Error("この画像は使用できません。別の画像でお試しください。"));
+        }
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 interface InviteInfo {
   code: string;
@@ -14,14 +45,20 @@ interface InviteInfo {
 export default function TeamView({
   companyCode,
   companyActive,
+  initialLogoUrl,
 }: {
   companyCode: string;
   companyActive: boolean;
+  initialLogoUrl: string | null;
 }) {
   const [pending, setPending] = useState<PendingMember[]>([]);
   const [approved, setApproved] = useState<PendingMember[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState("");
+
+  const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl);
+  const [logoLoading, setLogoLoading] = useState(false);
+  const [logoError, setLogoError] = useState("");
 
   const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -90,6 +127,43 @@ export default function TeamView({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const saveLogo = async (dataUrl: string | null) => {
+    setLogoLoading(true);
+    setLogoError("");
+    try {
+      const res = await fetch("/api/company/logo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoDataUrl: dataUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) setLogoError(data.error ?? "保存に失敗しました");
+      else setLogoUrl(data.logoUrl ?? null);
+    } catch {
+      setLogoError("通信エラーが発生しました");
+    }
+    setLogoLoading(false);
+  };
+
+  const onLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("画像ファイルを選択してください。");
+      return;
+    }
+    setLogoLoading(true);
+    setLogoError("");
+    try {
+      const dataUrl = await fileToLogoDataUrl(file);
+      await saveLogo(dataUrl);
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : "画像の処理に失敗しました");
+      setLogoLoading(false);
+    }
+  };
+
   const expiresText = invite
     ? new Date(invite.expiresAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
     : "";
@@ -97,6 +171,46 @@ export default function TeamView({
   return (
     <div className="px-6 py-8 max-w-3xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800">メンバー管理</h1>
+
+      {/* Company logo */}
+      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <ImageIcon size={18} className="text-slate-500" />
+          <h2 className="font-semibold text-slate-700">会社ロゴ</h2>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          ロゴを登録すると、見積書の右上に表示されます（任意）。PNG / JPEG などの画像を選んでください。
+        </p>
+
+        <div className="flex items-center gap-4">
+          <div className="w-40 h-20 border border-slate-200 rounded-xl flex items-center justify-center bg-slate-50 overflow-hidden flex-shrink-0">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="会社ロゴ" className="max-w-full max-h-full object-contain" />
+            ) : (
+              <span className="text-xs text-slate-400">未登録</span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium px-4 py-2.5 rounded-xl cursor-pointer transition-colors">
+              {logoLoading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+              画像を選ぶ
+              <input type="file" accept="image/*" className="hidden" onChange={onLogoFile} disabled={logoLoading} />
+            </label>
+            {logoUrl && (
+              <button
+                onClick={() => saveLogo(null)}
+                disabled={logoLoading}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-500 disabled:opacity-50 transition-colors"
+              >
+                <Trash2 size={14} />
+                ロゴを削除
+              </button>
+            )}
+          </div>
+        </div>
+        {logoError && <p className="text-sm text-red-500 mt-2">{logoError}</p>}
+      </section>
 
       {/* Invite code */}
       <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">

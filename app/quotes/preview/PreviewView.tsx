@@ -25,12 +25,14 @@ interface QuoteDraft {
 
 export default function PreviewView({
   companyName,
+  companyLogoUrl,
   companyPostalCode,
   companyAddress,
   companyPhone,
   personInCharge,
 }: {
   companyName: string;
+  companyLogoUrl: string | null;
   companyPostalCode: string | null;
   companyAddress: string | null;
   companyPhone: string | null;
@@ -123,6 +125,7 @@ export default function PreviewView({
       <div className="quote-paper bg-white rounded-2xl border border-slate-100 shadow-sm p-8 overflow-x-auto">
         <QuoteDocument
           companyName={companyName}
+          companyLogoUrl={companyLogoUrl}
           companyPostalCode={companyPostalCode}
           companyAddress={companyAddress}
           companyPhone={companyPhone}

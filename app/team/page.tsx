@@ -12,17 +12,22 @@ export default async function TeamPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("role, companies ( company_code, status )")
+    .select("role, companies ( company_code, status, logo_url )")
     .eq("id", user.id)
     .maybeSingle();
   if (!profile || profile.role !== "owner") redirect("/dashboard");
 
-  const company = (profile as unknown as { companies: { company_code: string; status: string } | null })
-    .companies;
+  const company = (profile as unknown as {
+    companies: { company_code: string; status: string; logo_url: string | null } | null;
+  }).companies;
 
   return (
     <AppShell>
-      <TeamView companyCode={company?.company_code ?? ""} companyActive={company?.status === "active"} />
+      <TeamView
+        companyCode={company?.company_code ?? ""}
+        companyActive={company?.status === "active"}
+        initialLogoUrl={company?.logo_url ?? null}
+      />
     </AppShell>
   );
 }

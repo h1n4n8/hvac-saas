@@ -182,8 +182,20 @@ export default function QuoteForm() {
 
     // Blank rows (e.g. the empty free-input row auto-added with each category)
     // are ignored so the user doesn't have to fill or delete them just to
-    // reach the preview. Totals already ignore blanks (unit price 0).
-    const filledItems = allItems.filter((i) => i.description.trim() !== "");
+    // reach the preview. Totals already ignore blanks (unit price 0). Each
+    // item keeps its category so the quote document can number by group; the
+    // free-input category is treated as "no category" (standalone rows).
+    const filledItems = categories.flatMap((c) =>
+      c.items
+        .filter((i) => i.description.trim() !== "")
+        .map((i) => ({
+          description: i.description,
+          category: c.category === "その他（自由入力）" ? "" : (c.category as string),
+          quantity: i.quantity,
+          unit: i.unit,
+          unitPrice: i.unitPrice,
+        }))
+    );
     if (filledItems.length === 0) return setError("品目を1つ以上入力してください");
 
     const quoteNo = `EST-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
@@ -193,7 +205,7 @@ export default function QuoteForm() {
       customerName,
       customerEmail,
       date,
-      items: filledItems.map((i) => ({ description: i.description, category: "", quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice })),
+      items: filledItems,
       notes,
       subtotal,
       discount,
