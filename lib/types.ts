@@ -1,8 +1,17 @@
+export type CompanyStatus = "pending" | "active";
+export type Role = "owner" | "employee";
+export type MemberStatus = "pending" | "approved" | "rejected";
+
 export interface Company {
   id: string;
+  company_code: string;
   name: string;
+  status: CompanyStatus;
   industry: string | null;
   employee_count: number | null;
+  postal_code: string | null;
+  address: string | null;
+  phone: string | null;
   plan_status: "free" | "trial" | "paid" | "suspended";
   created_at: string;
 }
@@ -11,6 +20,17 @@ export interface Profile {
   id: string;
   company_id: string;
   name: string;
+  email: string;
+  role: Role;
+  status: MemberStatus;
+  created_at: string;
+}
+
+export interface PendingMember {
+  id: string;
+  name: string;
+  email: string;
+  status: MemberStatus;
   created_at: string;
 }
 

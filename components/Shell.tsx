@@ -2,25 +2,30 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, FileText, LogOut, Wrench } from "lucide-react";
+import { LayoutDashboard, FileText, LogOut, Wrench, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-const NAV_ITEMS = [
+const BASE_NAV = [
   { label: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
   { label: "見積", href: "/quotes", icon: FileText },
 ];
+// Owner-only management screen (invite codes + employee approvals).
+const OWNER_NAV = [{ label: "メンバー", href: "/team", icon: Users }];
 
 export default function Shell({
   companyName,
   userName,
+  role,
   children,
 }: {
   companyName: string;
   userName: string;
+  role: "owner" | "employee";
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const NAV_ITEMS = role === "owner" ? [...BASE_NAV, ...OWNER_NAV] : BASE_NAV;
 
   const handleSignOut = async () => {
     const supabase = createClient();

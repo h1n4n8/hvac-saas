@@ -30,11 +30,12 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("company");
 
-  // Step 1: company basics
-  const [companyName, setCompanyName] = useState("");
+  // Step 1: 本登録 — company details (name & owner were set at 仮登録).
+  const [postalCode, setPostalCode] = useState("");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
   const [industry, setIndustry] = useState("");
   const [employeeCount, setEmployeeCount] = useState("");
-  const [userName, setUserName] = useState("");
   const [companyError, setCompanyError] = useState("");
   const [companyLoading, setCompanyLoading] = useState(false);
 
@@ -49,25 +50,22 @@ export default function OnboardingPage() {
   const handleCompanySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCompanyError("");
-    if (!companyName || !userName) {
-      setCompanyError("会社名と担当者名を入力してください");
-      return;
-    }
     setCompanyLoading(true);
     try {
-      const res = await fetch("/api/onboarding/create-company", {
+      const res = await fetch("/api/auth/complete-registration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyName,
           industry,
           employeeCount: employeeCount ? Number(employeeCount) : null,
-          userName,
+          postalCode,
+          address,
+          phone,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setCompanyError(data.error ?? "登録に失敗しました");
+        setCompanyError(data.error ?? "本登録に失敗しました");
         setCompanyLoading(false);
         return;
       }
@@ -163,34 +161,42 @@ export default function OnboardingPage() {
               <div className="inline-flex items-center justify-center w-14 h-14 bg-slate-800 rounded-2xl mb-3">
                 <Wrench size={26} className="text-white" />
               </div>
-              <h1 className="text-lg font-semibold text-slate-800">会社情報の登録</h1>
-              <p className="text-slate-500 text-sm mt-1">はじめに、会社の基本情報を教えてください。</p>
+              <h1 className="text-lg font-semibold text-slate-800">本登録(会社の詳細情報)</h1>
+              <p className="text-slate-500 text-sm mt-1">
+                会社の詳細を登録すると、従業員の招待ができるようになります。見積書にも会社情報として使われます。
+              </p>
             </div>
             <form onSubmit={handleCompanySubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  会社名 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="例: 山田設備工事株式会社"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-100 outline-none text-base"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">郵便番号</label>
+                  <input
+                    type="text"
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    placeholder="123-4567"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-base"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">住所</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="〇〇県〇〇市…"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-base"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  担当者名 <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">電話番号</label>
                 <input
-                  type="text"
-                  required
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="例: 山田太郎"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-100 outline-none text-base"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="03-1234-5678"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-base"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -226,7 +232,7 @@ export default function OnboardingPage() {
                 disabled={companyLoading}
                 className="w-full bg-slate-800 hover:bg-slate-900 disabled:opacity-60 text-white font-semibold py-3.5 rounded-xl transition-colors text-base mt-2"
               >
-                {companyLoading ? "登録中..." : "次へ"}
+                {companyLoading ? "登録中..." : "本登録して次へ"}
               </button>
             </form>
           </div>
