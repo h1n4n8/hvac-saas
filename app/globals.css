@@ -24,11 +24,53 @@ body {
   color: var(--foreground);
 }
 
+@page {
+  margin: 14mm;
+}
+
 @media print {
+  /* Toolbars, banners, and other on-screen-only bits. */
   .no-print {
     display: none !important;
   }
+
+  /* Hide the app shell chrome (sidebar + mobile bottom nav) so the quote is
+     the only thing on the page. Without this the sidebar and the md:ml-56
+     content offset stay in the printout and shove the quote off-page. */
+  aside,
+  nav {
+    display: none !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* The centered page wrapper: drop its screen padding/width caps so the
+     quote fills the printable area. */
+  .print-container {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* The quote "sheet": strip the card chrome (shadow/border/rounded) that
+     only makes sense on screen. */
+  .quote-paper {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
   body {
-    background: white;
+    background: #fff !important;
+  }
+
+  /* Keep table header shading etc. in the printout. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

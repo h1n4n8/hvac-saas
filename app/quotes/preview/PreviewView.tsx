@@ -77,7 +77,7 @@ export default function PreviewView({ companyName }: { companyName: string }) {
   const rawSubtotal = draft.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
 
   return (
-    <div className="px-6 py-8 max-w-3xl mx-auto">
+    <div className="print-container px-6 py-8 max-w-3xl mx-auto">
       <div className="no-print flex items-center justify-between mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-slate-600 hover:underline">
           <ChevronLeft size={18} />
@@ -106,7 +106,7 @@ export default function PreviewView({ companyName }: { companyName: string }) {
         <div className="no-print bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8">
+      <div className="quote-paper bg-white rounded-2xl border border-slate-100 shadow-sm p-8">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-800 tracking-widest">見　積　書</h1>
         </div>
