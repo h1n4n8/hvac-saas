@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, FileText, LogOut, Wrench, Users } from "lucide-react";
+import { LayoutDashboard, FileText, LogOut, Wrench, Users, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const BASE_NAV = [
   { label: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
   { label: "見積", href: "/quotes", icon: FileText },
 ];
-// Owner-only management screen (invite codes + employee approvals).
-const OWNER_NAV = [{ label: "メンバー", href: "/team", icon: Users }];
+// Owner-only screens: member management + company settings.
+const OWNER_NAV = [
+  { label: "メンバー", href: "/team", icon: Users },
+  { label: "会社設定", href: "/settings", icon: Settings },
+];
 
 export default function Shell({
   companyName,
