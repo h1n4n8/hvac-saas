@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import DetailView from "./DetailView";
 import { createClient } from "@/lib/supabase/server";
+import { getCompanyLogo } from "@/lib/companyLogo";
 import type { Quote } from "@/lib/types";
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,9 +14,10 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
 
   const { data: company } = await supabase
     .from("companies")
-    .select("name, postal_code, address, phone, logo_url")
+    .select("name, postal_code, address, phone")
     .eq("id", quote.company_id)
     .maybeSingle();
+  const logoUrl = await getCompanyLogo(supabase, quote.company_id);
 
   let personInCharge = "";
   if (quote.owner_id) {
@@ -28,7 +30,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
       <DetailView
         quote={quote as Quote}
         companyName={company?.name ?? ""}
-        companyLogoUrl={company?.logo_url ?? null}
+        companyLogoUrl={logoUrl}
         companyPostalCode={company?.postal_code ?? null}
         companyAddress={company?.address ?? null}
         companyPhone={company?.phone ?? null}
