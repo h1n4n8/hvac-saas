@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Image as ImageIcon, Loader2, Trash2, Check } from "lucide-react";
+import { Building2, Image as ImageIcon, Loader2, Trash2, Check, FileText } from "lucide-react";
 
 interface CompanyForm {
   name: string;
@@ -11,6 +11,8 @@ interface CompanyForm {
   industry: string;
   employeeCount: string;
 }
+
+type Tab = "company" | "quote";
 
 // Downscale an image file to a small PNG data URL so the stored logo stays
 // tiny (fits comfortably in a DB text column).
@@ -47,11 +49,15 @@ export default function SettingsView({
   companyCode,
   initial,
   initialLogoUrl,
+  initialShowLogoOnQuote,
 }: {
   companyCode: string;
   initial: CompanyForm;
   initialLogoUrl: string | null;
+  initialShowLogoOnQuote: boolean;
 }) {
+  const [tab, setTab] = useState<Tab>("company");
+
   const [form, setForm] = useState<CompanyForm>(initial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -60,6 +66,32 @@ export default function SettingsView({
   const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl);
   const [logoLoading, setLogoLoading] = useState(false);
   const [logoError, setLogoError] = useState("");
+
+  const [showLogo, setShowLogo] = useState(initialShowLogoOnQuote);
+  const [showLogoSaving, setShowLogoSaving] = useState(false);
+  const [showLogoError, setShowLogoError] = useState("");
+
+  const updateShowLogo = async (next: boolean) => {
+    setShowLogo(next);
+    setShowLogoSaving(true);
+    setShowLogoError("");
+    try {
+      const res = await fetch("/api/company/quote-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showLogoOnQuote: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setShowLogo(!next); // revert
+        setShowLogoError(data.error ?? "保存に失敗しました");
+      }
+    } catch {
+      setShowLogo(!next);
+      setShowLogoError("通信エラーが発生しました");
+    }
+    setShowLogoSaving(false);
+  };
 
   const set = (k: keyof CompanyForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -134,10 +166,32 @@ export default function SettingsView({
 
   return (
     <div className="px-6 py-8 max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">会社設定</h1>
+      <h1 className="text-2xl font-bold text-slate-800">設定</h1>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setTab("company")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            tab === "company" ? "bg-slate-800 text-white" : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          <Building2 size={16} />
+          会社詳細設定
+        </button>
+        <button
+          onClick={() => setTab("quote")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            tab === "quote" ? "bg-slate-800 text-white" : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          <FileText size={16} />
+          見積書詳細設定
+        </button>
+      </div>
 
       {/* Company details */}
-      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <section className={`bg-white rounded-2xl border border-slate-100 shadow-sm p-6 ${tab === "company" ? "" : "hidden"}`}>
         <div className="flex items-center gap-2 mb-1">
           <Building2 size={18} className="text-slate-500" />
           <h2 className="font-semibold text-slate-700">会社の詳細</h2>
@@ -196,8 +250,8 @@ export default function SettingsView({
         </form>
       </section>
 
-      {/* Company logo */}
-      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      {/* Company logo (part of 会社詳細設定) */}
+      <section className={`bg-white rounded-2xl border border-slate-100 shadow-sm p-6 ${tab === "company" ? "" : "hidden"}`}>
         <div className="flex items-center gap-2 mb-1">
           <ImageIcon size={18} className="text-slate-500" />
           <h2 className="font-semibold text-slate-700">会社ロゴ(任意)</h2>
@@ -234,6 +288,46 @@ export default function SettingsView({
           </div>
         </div>
         {logoError && <p className="text-sm text-red-500 mt-2">{logoError}</p>}
+      </section>
+
+      {/* 見積書詳細設定 */}
+      <section className={`bg-white rounded-2xl border border-slate-100 shadow-sm p-6 ${tab === "quote" ? "" : "hidden"}`}>
+        <div className="flex items-center gap-2 mb-1">
+          <FileText size={18} className="text-slate-500" />
+          <h2 className="font-semibold text-slate-700">見積書の表示設定</h2>
+        </div>
+        <p className="text-xs text-slate-400 mb-4">見積書の見た目に関する設定です。</p>
+
+        <label className="flex items-center justify-between gap-4 py-2 cursor-pointer">
+          <span className="text-sm text-slate-700">
+            見積書にロゴを表示する
+            <span className="block text-xs text-slate-400 mt-0.5">
+              オンにすると、登録した会社ロゴが見積書の右上に表示されます。
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showLogo}
+            onClick={() => updateShowLogo(!showLogo)}
+            disabled={showLogoSaving}
+            className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-60 ${
+              showLogo ? "bg-slate-800" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                showLogo ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </label>
+        {!logoUrl && (
+          <p className="text-xs text-amber-600 mt-2">
+            ※ まだロゴが登録されていません。「会社詳細設定」からロゴを登録すると表示されます。
+          </p>
+        )}
+        {showLogoError && <p className="text-sm text-red-500 mt-2">{showLogoError}</p>}
       </section>
     </div>
   );

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import DetailView from "./DetailView";
 import { createClient } from "@/lib/supabase/server";
-import { getCompanyLogo } from "@/lib/companyLogo";
+import { getCompanyLogo, getShowLogoOnQuote } from "@/lib/companyLogo";
 import type { Quote } from "@/lib/types";
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +17,9 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
     .select("name, postal_code, address, phone")
     .eq("id", quote.company_id)
     .maybeSingle();
-  const logoUrl = await getCompanyLogo(supabase, quote.company_id);
+  const logoUrl = (await getShowLogoOnQuote(supabase, quote.company_id))
+    ? await getCompanyLogo(supabase, quote.company_id)
+    : null;
 
   let personInCharge = "";
   if (quote.owner_id) {

@@ -13,6 +13,7 @@ export interface Company {
   address: string | null;
   phone: string | null;
   logo_url: string | null;
+  show_logo_on_quote: boolean;
   plan_status: "free" | "trial" | "paid" | "suspended";
   created_at: string;
 }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { createClient } from "@/lib/supabase/server";
-import { getCompanyLogo } from "@/lib/companyLogo";
+import { getCompanyLogo, getShowLogoOnQuote } from "@/lib/companyLogo";
 import SettingsView from "./SettingsView";
 
 export default async function SettingsPage() {
@@ -32,6 +32,7 @@ export default async function SettingsPage() {
   }).companies;
 
   const logoUrl = company?.id ? await getCompanyLogo(supabase, company.id) : null;
+  const showLogoOnQuote = company?.id ? await getShowLogoOnQuote(supabase, company.id) : true;
 
   return (
     <AppShell>
@@ -46,6 +47,7 @@ export default async function SettingsPage() {
           employeeCount: company?.employee_count != null ? String(company.employee_count) : "",
         }}
         initialLogoUrl={logoUrl}
+        initialShowLogoOnQuote={showLogoOnQuote}
       />
     </AppShell>
   );

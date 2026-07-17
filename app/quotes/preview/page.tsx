@@ -1,7 +1,7 @@
 import AppShell from "@/components/AppShell";
 import PreviewView from "./PreviewView";
 import { createClient } from "@/lib/supabase/server";
-import { getCompanyLogo } from "@/lib/companyLogo";
+import { getCompanyLogo, getShowLogoOnQuote } from "@/lib/companyLogo";
 
 export default async function QuotePreviewPage() {
   const supabase = await createClient();
@@ -23,7 +23,10 @@ export default async function QuotePreviewPage() {
     } | null;
   })?.companies;
   const personInCharge = (profile as unknown as { name: string } | null)?.name ?? "";
-  const logoUrl = company?.id ? await getCompanyLogo(supabase, company.id) : null;
+  const logoUrl =
+    company?.id && (await getShowLogoOnQuote(supabase, company.id))
+      ? await getCompanyLogo(supabase, company.id)
+      : null;
 
   return (
     <AppShell>
