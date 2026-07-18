@@ -35,6 +35,7 @@ const today = new Date().toISOString().slice(0, 10);
 export default function QuoteForm() {
   const router = useRouter();
 
+  const [quoteNo, setQuoteNo] = useState("");
   const [projectName, setProjectName] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerContact, setCustomerContact] = useState("");
@@ -60,6 +61,8 @@ export default function QuoteForm() {
   const [usedAi, setUsedAi] = useState(false);
 
   useEffect(() => {
+    // Pre-fill a default quote number the user can edit.
+    setQuoteNo(`EST-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`);
     const supabase = createClient();
     supabase
       .from("quote_items")
@@ -201,9 +204,9 @@ export default function QuoteForm() {
     );
     if (filledItems.length === 0) return setError("品目を1つ以上入力してください");
 
-    const quoteNo = `EST-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+    const finalQuoteNo = quoteNo.trim() || `EST-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const draft = {
-      quoteNo,
+      quoteNo: finalQuoteNo,
       projectName,
       customerName,
       customerContact,
@@ -235,6 +238,16 @@ export default function QuoteForm() {
         <div className="space-y-4">
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
             <h2 className="font-semibold text-slate-700 text-sm">基本情報</h2>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">見積番号</label>
+              <input
+                type="text"
+                value={quoteNo}
+                onChange={(e) => setQuoteNo(e.target.value)}
+                placeholder="例: EST-2026-00042"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-100 outline-none text-sm"
+              />
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 工事名 <span className="text-red-500">*</span>
