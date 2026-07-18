@@ -23,6 +23,7 @@ interface ParseResponse {
   needsReview: boolean;
   items: ParsedQuoteItem[];
   processedFiles: ProcessedFile[];
+  fieldSettings?: Record<string, boolean> | null;
   error?: string;
 }
 
@@ -94,6 +95,16 @@ export default function OnboardingPage() {
       }
       setParseResult(data);
       setSelectedItems(new Set(data.items.map((_, i) => i)));
+
+      // AI decided which fields this company usually shows on its quotes —
+      // persist that as the initial 見積書詳細設定 (best-effort).
+      if (data.fieldSettings) {
+        fetch("/api/company/quote-settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fieldSettings: data.fieldSettings }),
+        }).catch(() => {});
+      }
     } catch {
       setImportError("通信エラーが発生しました。ネットワークをご確認ください。");
     }

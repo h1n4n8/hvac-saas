@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import QuoteDocument from "@/components/QuoteDocument";
 import OrientationToggle, { type Orientation } from "@/components/OrientationToggle";
 import type { Quote, QuoteStatus } from "@/lib/types";
+import type { QuoteFieldSettings } from "@/lib/quoteFields";
 
 const statusStyles: Record<QuoteStatus, string> = {
   確定: "bg-green-600 text-white",
@@ -23,7 +24,13 @@ export default function DetailView({
   companyPostalCode,
   companyAddress,
   companyPhone,
+  companyEmail,
+  invoiceRegNo,
+  bankInfo,
+  defaultValidityDays,
+  defaultPaymentTerms,
   personInCharge,
+  fieldSettings,
 }: {
   quote: Quote;
   companyName: string;
@@ -31,7 +38,13 @@ export default function DetailView({
   companyPostalCode: string | null;
   companyAddress: string | null;
   companyPhone: string | null;
+  companyEmail: string | null;
+  invoiceRegNo: string | null;
+  bankInfo: string | null;
+  defaultValidityDays: string | null;
+  defaultPaymentTerms: string | null;
   personInCharge: string;
+  fieldSettings: QuoteFieldSettings;
 }) {
   const router = useRouter();
   const [quote, setQuote] = useState(initialQuote);
@@ -96,14 +109,23 @@ export default function DetailView({
           companyPostalCode={companyPostalCode}
           companyAddress={companyAddress}
           companyPhone={companyPhone}
+          companyEmail={companyEmail}
+          invoiceRegNo={invoiceRegNo}
+          bankInfo={bankInfo}
           personInCharge={personInCharge}
           customerName={quote.customer_name}
+          customerContact={quote.customer_contact ?? null}
           projectName={quote.project_name}
+          siteAddress={quote.site_address ?? null}
+          constructionPeriod={quote.construction_period ?? null}
           quoteNo={quote.quote_no}
           date={new Date(quote.created_at).toISOString().slice(0, 10)}
+          validityDays={defaultValidityDays || undefined}
+          paymentMethod={defaultPaymentTerms || undefined}
           items={quote.items}
           discount={quote.discount}
           notes={quote.notes}
+          fields={fieldSettings}
         />
       </div>
     </div>

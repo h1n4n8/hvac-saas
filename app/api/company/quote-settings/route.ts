@@ -24,8 +24,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "見積の設定は社長のみ変更できます。" }, { status: 403 });
   }
 
-  const { showLogoOnQuote } = (await request.json()) as { showLogoOnQuote?: boolean };
-  if (typeof showLogoOnQuote !== "boolean") {
+  const { showLogoOnQuote, fieldSettings } = (await request.json()) as {
+    showLogoOnQuote?: boolean;
+    fieldSettings?: Record<string, boolean>;
+  };
+  if (typeof showLogoOnQuote !== "boolean" && !fieldSettings) {
     return NextResponse.json({ error: "リクエストが不正です。" }, { status: 400 });
   }
 
@@ -37,14 +40,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await admin
-    .from("companies")
-    .update({ show_logo_on_quote: showLogoOnQuote })
-    .eq("id", profile.company_id);
-  if (error) {
-    // Most likely the column doesn't exist yet (migration not run).
+  // Each column may not exist yet (0004 / 0005); update them independently so a
+  // missing one doesn't block the other.
+  let anyError: string | null = null;
+  if (typeof showLogoOnQuote === "boolean") {
+    const { error } = await admin
+      .from("companies")
+      .update({ show_logo_on_quote: showLogoOnQuote })
+      .eq("id", profile.company_id);
+    if (error) anyError = error.message;
+  }
+  if (fieldSettings) {
+    const { error } = await admin
+      .from("companies")
+      .update({ quote_field_settings: fieldSettings })
+      .eq("id", profile.company_id);
+    if (error) anyError = error.message;
+  }
+
+  if (anyError) {
     return NextResponse.json(
-      { error: "設定を保存できませんでした。管理者にデータベースの更新をご確認ください。" },
+      { error: "設定を保存できませんでした。データベースの更新(マイグレーション)が必要な可能性があります。" },
       { status: 500 }
     );
   }

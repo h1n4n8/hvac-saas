@@ -25,14 +25,20 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { name, postalCode, address, phone, industry, employeeCount } = body as {
-    name?: string;
-    postalCode?: string;
-    address?: string;
-    phone?: string;
-    industry?: string;
-    employeeCount?: number | null;
-  };
+  const { name, postalCode, address, phone, industry, employeeCount, email, bankInfo, invoiceRegNumber, defaultValidityDays, defaultPaymentTerms } =
+    body as {
+      name?: string;
+      postalCode?: string;
+      address?: string;
+      phone?: string;
+      industry?: string;
+      employeeCount?: number | null;
+      email?: string;
+      bankInfo?: string;
+      invoiceRegNumber?: string;
+      defaultValidityDays?: string;
+      defaultPaymentTerms?: string;
+    };
   if (!name || !name.trim()) {
     return NextResponse.json({ error: "会社名を入力してください。" }, { status: 400 });
   }
@@ -45,17 +51,29 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await admin
-    .from("companies")
-    .update({
-      name: name.trim(),
-      postal_code: postalCode || null,
-      address: address || null,
-      phone: phone || null,
-      industry: industry || null,
-      employee_count: employeeCount || null,
-    })
-    .eq("id", profile.company_id);
+  // Core fields exist since 0002; the extras only after 0005. Try both, and on
+  // failure fall back to core-only so saving still works before the migration.
+  const core = {
+    name: name.trim(),
+    postal_code: postalCode || null,
+    address: address || null,
+    phone: phone || null,
+    industry: industry || null,
+    employee_count: employeeCount || null,
+  };
+  const full = {
+    ...core,
+    email: email || null,
+    bank_info: bankInfo || null,
+    invoice_reg_number: invoiceRegNumber || null,
+    default_validity_days: defaultValidityDays || null,
+    default_payment_terms: defaultPaymentTerms || null,
+  };
+
+  let error = (await admin.from("companies").update(full).eq("id", profile.company_id)).error;
+  if (error) {
+    error = (await admin.from("companies").update(core).eq("id", profile.company_id)).error;
+  }
   if (error) {
     return NextResponse.json({ error: `保存に失敗しました: ${error.message}` }, { status: 500 });
   }

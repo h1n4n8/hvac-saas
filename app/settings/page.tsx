@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { createClient } from "@/lib/supabase/server";
-import { getCompanyLogo, getShowLogoOnQuote } from "@/lib/companyLogo";
+import { getCompanyLogo, getShowLogoOnQuote, getCompanyQuoteConfig } from "@/lib/companyLogo";
 import SettingsView from "./SettingsView";
 
 export default async function SettingsPage() {
@@ -33,6 +33,16 @@ export default async function SettingsPage() {
 
   const logoUrl = company?.id ? await getCompanyLogo(supabase, company.id) : null;
   const showLogoOnQuote = company?.id ? await getShowLogoOnQuote(supabase, company.id) : true;
+  const config = company?.id
+    ? await getCompanyQuoteConfig(supabase, company.id)
+    : {
+        email: null,
+        bankInfo: null,
+        invoiceRegNumber: null,
+        defaultValidityDays: null,
+        defaultPaymentTerms: null,
+        fieldSettings: (await import("@/lib/quoteFields")).DEFAULT_QUOTE_FIELD_SETTINGS,
+      };
 
   return (
     <AppShell>
@@ -45,9 +55,15 @@ export default async function SettingsPage() {
           phone: company?.phone ?? "",
           industry: company?.industry ?? "",
           employeeCount: company?.employee_count != null ? String(company.employee_count) : "",
+          email: config.email ?? "",
+          bankInfo: config.bankInfo ?? "",
+          invoiceRegNumber: config.invoiceRegNumber ?? "",
+          defaultValidityDays: config.defaultValidityDays ?? "",
+          defaultPaymentTerms: config.defaultPaymentTerms ?? "",
         }}
         initialLogoUrl={logoUrl}
         initialShowLogoOnQuote={showLogoOnQuote}
+        initialFieldSettings={config.fieldSettings}
       />
     </AppShell>
   );

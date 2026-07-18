@@ -12,8 +12,14 @@ export interface Company {
   postal_code: string | null;
   address: string | null;
   phone: string | null;
+  email: string | null;
+  bank_info: string | null;
+  invoice_reg_number: string | null;
+  default_validity_days: string | null;
+  default_payment_terms: string | null;
   logo_url: string | null;
   show_logo_on_quote: boolean;
+  quote_field_settings: Record<string, boolean>;
   plan_status: "free" | "trial" | "paid" | "suspended";
   created_at: string;
 }
@@ -54,6 +60,9 @@ export interface Quote {
   project_name: string;
   customer_name: string;
   customer_email: string | null;
+  customer_contact: string | null;
+  site_address: string | null;
+  construction_period: string | null;
   items: QuoteLineItem[];
   notes: string;
   subtotal: number;

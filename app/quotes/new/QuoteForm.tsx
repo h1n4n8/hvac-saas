@@ -37,7 +37,10 @@ export default function QuoteForm() {
 
   const [projectName, setProjectName] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerContact, setCustomerContact] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [siteAddress, setSiteAddress] = useState("");
+  const [constructionPeriod, setConstructionPeriod] = useState("");
   const [date, setDate] = useState(today);
   const [notes, setNotes] = useState(
     "①本見積書には消費税は含まれておりません。\n②本見積書には法定福利費が含まれております。\n③その他、記述なき事項につきましては別途とさせて頂きます。"
@@ -203,7 +206,10 @@ export default function QuoteForm() {
       quoteNo,
       projectName,
       customerName,
+      customerContact,
       customerEmail,
+      siteAddress,
+      constructionPeriod,
       date,
       items: filledItems,
       notes,
@@ -254,6 +260,18 @@ export default function QuoteForm() {
                 />
               </div>
               <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">顧客の担当者名</label>
+                <input
+                  type="text"
+                  value={customerContact}
+                  onChange={(e) => setCustomerContact(e.target.value)}
+                  placeholder="例: 田中様"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">顧客メール</label>
                 <input
                   type="email"
@@ -262,13 +280,33 @@ export default function QuoteForm() {
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-sm"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">見積日</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-sm"
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">見積日</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">現場住所</label>
               <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+                type="text"
+                value={siteAddress}
+                onChange={(e) => setSiteAddress(e.target.value)}
+                placeholder="例: 〇〇県〇〇市…"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">工期・施工予定日</label>
+              <input
+                type="text"
+                value={constructionPeriod}
+                onChange={(e) => setConstructionPeriod(e.target.value)}
+                placeholder="例: 2026年8月上旬〜8月下旬"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-slate-500 outline-none text-sm"
               />
             </div>

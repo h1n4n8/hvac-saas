@@ -7,12 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 import QuoteDocument from "@/components/QuoteDocument";
 import OrientationToggle, { type Orientation } from "@/components/OrientationToggle";
 import type { QuoteLineItem } from "@/lib/types";
+import type { QuoteFieldSettings } from "@/lib/quoteFields";
 
 interface QuoteDraft {
   quoteNo: string;
   projectName: string;
   customerName: string;
+  customerContact?: string;
   customerEmail: string;
+  siteAddress?: string;
+  constructionPeriod?: string;
   date: string;
   items: QuoteLineItem[];
   notes: string;
@@ -23,21 +27,22 @@ interface QuoteDraft {
   aiGenerated: boolean;
 }
 
-export default function PreviewView({
-  companyName,
-  companyLogoUrl,
-  companyPostalCode,
-  companyAddress,
-  companyPhone,
-  personInCharge,
-}: {
+interface Props {
   companyName: string;
   companyLogoUrl: string | null;
   companyPostalCode: string | null;
   companyAddress: string | null;
   companyPhone: string | null;
+  companyEmail: string | null;
+  invoiceRegNo: string | null;
+  bankInfo: string | null;
+  defaultValidityDays: string | null;
+  defaultPaymentTerms: string | null;
   personInCharge: string;
-}) {
+  fieldSettings: QuoteFieldSettings;
+}
+
+export default function PreviewView(props: Props) {
   const router = useRouter();
   const [draft, setDraft] = useState<QuoteDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -64,7 +69,7 @@ export default function PreviewView({
       const { data: profile } = await supabase.from("users").select("company_id").eq("id", user!.id).maybeSingle();
       if (!profile) throw new Error("会社情報が見つかりません");
 
-      const { error: insertError } = await supabase.from("quotes").insert({
+      const base = {
         company_id: profile.company_id,
         owner_id: user!.id,
         quote_no: draft.quoteNo,
@@ -77,9 +82,22 @@ export default function PreviewView({
         discount: draft.discount,
         tax_amount: draft.taxAmount,
         total: draft.total,
-        status: "未確定",
+        status: "未確定" as const,
         ai_generated: draft.aiGenerated,
-      });
+      };
+      const withExtras = {
+        ...base,
+        customer_contact: draft.customerContact || null,
+        site_address: draft.siteAddress || null,
+        construction_period: draft.constructionPeriod || null,
+      };
+
+      // Try inserting with the 0005 columns; if they don't exist yet, fall
+      // back to the base columns so saving still works.
+      let insertError = (await supabase.from("quotes").insert(withExtras)).error;
+      if (insertError) {
+        insertError = (await supabase.from("quotes").insert(base)).error;
+      }
       if (insertError) throw new Error(insertError.message);
 
       sessionStorage.removeItem("quote_draft");
@@ -124,26 +142,36 @@ export default function PreviewView({
 
       <div className="quote-paper bg-white rounded-2xl border border-slate-100 shadow-sm p-8 overflow-x-auto">
         <QuoteDocument
-          companyName={companyName}
-          companyLogoUrl={companyLogoUrl}
-          companyPostalCode={companyPostalCode}
-          companyAddress={companyAddress}
-          companyPhone={companyPhone}
-          personInCharge={personInCharge}
+          companyName={props.companyName}
+          companyLogoUrl={props.companyLogoUrl}
+          companyPostalCode={props.companyPostalCode}
+          companyAddress={props.companyAddress}
+          companyPhone={props.companyPhone}
+          companyEmail={props.companyEmail}
+          invoiceRegNo={props.invoiceRegNo}
+          bankInfo={props.bankInfo}
+          personInCharge={props.personInCharge}
           customerName={draft.customerName}
+          customerContact={draft.customerContact ?? null}
           projectName={draft.projectName}
+          siteAddress={draft.siteAddress ?? null}
+          constructionPeriod={draft.constructionPeriod ?? null}
           quoteNo={draft.quoteNo}
           date={draft.date}
+          validityDays={props.defaultValidityDays || undefined}
+          paymentMethod={props.defaultPaymentTerms || undefined}
           items={draft.items}
           discount={draft.discount}
           notes={draft.notes}
+          fields={props.fieldSettings}
         />
       </div>
 
       <div className="no-print mt-4 bg-blue-50 border border-blue-100 rounded-xl px-5 py-4 text-sm text-blue-700">
         <p className="font-medium mb-0.5">印刷・保存について</p>
         <p className="text-xs text-blue-600">
-          「印刷・PDF」は横向き(A4ヨコ)で出力されます。印刷ダイアログで「背景のグラフィック」をオンにすると罫線や色がきれいに出ます。保存すると「未確定」として登録され、確定は見積詳細画面から明示的に操作します。
+          印刷の向き(縦/横)は上のボタンで選べます。印刷ダイアログで「背景のグラフィック」をオンにすると罫線や色がきれいに出ます。保存すると「未確定」として登録され、確定は見積詳細画面から明示的に操作します。表示する項目は「会社設定 →
+          見積書詳細設定」で切り替えできます。
         </p>
       </div>
     </div>

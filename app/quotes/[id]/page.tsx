@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import DetailView from "./DetailView";
 import { createClient } from "@/lib/supabase/server";
-import { getCompanyLogo, getShowLogoOnQuote } from "@/lib/companyLogo";
+import { getCompanyLogo, getShowLogoOnQuote, getCompanyQuoteConfig } from "@/lib/companyLogo";
 import type { Quote } from "@/lib/types";
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +20,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
   const logoUrl = (await getShowLogoOnQuote(supabase, quote.company_id))
     ? await getCompanyLogo(supabase, quote.company_id)
     : null;
+  const config = await getCompanyQuoteConfig(supabase, quote.company_id);
 
   let personInCharge = "";
   if (quote.owner_id) {
@@ -36,7 +37,13 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
         companyPostalCode={company?.postal_code ?? null}
         companyAddress={company?.address ?? null}
         companyPhone={company?.phone ?? null}
+        companyEmail={config.email}
+        invoiceRegNo={config.invoiceRegNumber}
+        bankInfo={config.bankInfo}
+        defaultValidityDays={config.defaultValidityDays}
+        defaultPaymentTerms={config.defaultPaymentTerms}
         personInCharge={personInCharge}
+        fieldSettings={config.fieldSettings}
       />
     </AppShell>
   );

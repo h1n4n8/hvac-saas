@@ -1,7 +1,7 @@
 import AppShell from "@/components/AppShell";
 import PreviewView from "./PreviewView";
 import { createClient } from "@/lib/supabase/server";
-import { getCompanyLogo, getShowLogoOnQuote } from "@/lib/companyLogo";
+import { getCompanyLogo, getShowLogoOnQuote, getCompanyQuoteConfig } from "@/lib/companyLogo";
 
 export default async function QuotePreviewPage() {
   const supabase = await createClient();
@@ -23,10 +23,20 @@ export default async function QuotePreviewPage() {
     } | null;
   })?.companies;
   const personInCharge = (profile as unknown as { name: string } | null)?.name ?? "";
+
+  const companyId = company?.id;
   const logoUrl =
-    company?.id && (await getShowLogoOnQuote(supabase, company.id))
-      ? await getCompanyLogo(supabase, company.id)
-      : null;
+    companyId && (await getShowLogoOnQuote(supabase, companyId)) ? await getCompanyLogo(supabase, companyId) : null;
+  const config = companyId
+    ? await getCompanyQuoteConfig(supabase, companyId)
+    : {
+        email: null,
+        bankInfo: null,
+        invoiceRegNumber: null,
+        defaultValidityDays: null,
+        defaultPaymentTerms: null,
+        fieldSettings: (await import("@/lib/quoteFields")).DEFAULT_QUOTE_FIELD_SETTINGS,
+      };
 
   return (
     <AppShell>
@@ -36,7 +46,13 @@ export default async function QuotePreviewPage() {
         companyPostalCode={company?.postal_code ?? null}
         companyAddress={company?.address ?? null}
         companyPhone={company?.phone ?? null}
+        companyEmail={config.email}
+        invoiceRegNo={config.invoiceRegNumber}
+        bankInfo={config.bankInfo}
+        defaultValidityDays={config.defaultValidityDays}
+        defaultPaymentTerms={config.defaultPaymentTerms}
         personInCharge={personInCharge}
+        fieldSettings={config.fieldSettings}
       />
     </AppShell>
   );

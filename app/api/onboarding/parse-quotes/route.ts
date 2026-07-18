@@ -126,11 +126,14 @@ export async function POST(request: Request) {
 2. 小計・消費税・合計・値引きなどの集計行は品目として抽出しないでください。
 3. 複数のファイル・見積もりに同じ品目が登場する場合は1つにまとめ、代表的（直近または最頻）な単価を採用してください。
 4. 全体として読み取りの確信が持てない（表の意味が曖昧、単価が数値として読めない等）場合は confidence を "low" にしてください。
+5. この過去見積書に以下の各項目が「記載されているか」を判定し、fieldSettings として true(記載あり) / false(記載なし) で返してください。この会社が普段どの項目を見積書に載せているかの初期設定に使います。
+   - companyAddress(会社住所) / companyPhone(電話番号) / companyEmail(メールアドレス) / personInCharge(自社の担当者名) / customerContact(顧客の担当者名) / projectName(工事名) / siteAddress(現場住所) / quoteNo(見積番号) / issueDate(発行日) / validity(見積有効期限) / constructionPeriod(工期・施工予定日) / paymentTerms(支払条件) / bankInfo(振込先) / invoiceRegNo(インボイス登録番号)
 
 次のJSON形式のみで出力してください(説明文やコードブロック記法は不要):
 {
   "confidence": "high" | "low",
-  "items": [ { "category": string, "name": string, "unit": string, "unitPrice": number } ]
+  "items": [ { "category": string, "name": string, "unit": string, "unitPrice": number } ],
+  "fieldSettings": { "companyAddress": boolean, "companyPhone": boolean, "companyEmail": boolean, "personInCharge": boolean, "customerContact": boolean, "projectName": boolean, "siteAddress": boolean, "quoteNo": boolean, "issueDate": boolean, "validity": boolean, "constructionPeriod": boolean, "paymentTerms": boolean, "bankInfo": boolean, "invoiceRegNo": boolean }
 }`,
   });
 
@@ -150,7 +153,11 @@ export async function POST(request: Request) {
     );
   }
 
-  let parsed: { confidence: "high" | "low"; items: ParsedItem[] };
+  let parsed: {
+    confidence: "high" | "low";
+    items: ParsedItem[];
+    fieldSettings?: Record<string, boolean>;
+  };
   try {
     const jsonMatch = aiText.match(/\{[\s\S]*\}/);
     parsed = JSON.parse(jsonMatch ? jsonMatch[0] : aiText);
@@ -163,6 +170,8 @@ export async function POST(request: Request) {
 
   const items = Array.isArray(parsed.items) ? parsed.items : [];
   const needsReview = parsed.confidence === "low" || items.length === 0;
+  const fieldSettings =
+    parsed.fieldSettings && typeof parsed.fieldSettings === "object" ? parsed.fieldSettings : null;
 
-  return NextResponse.json({ needsReview, items, processedFiles });
+  return NextResponse.json({ needsReview, items, processedFiles, fieldSettings });
 }

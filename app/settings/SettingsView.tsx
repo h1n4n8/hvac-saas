@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Building2, Image as ImageIcon, Loader2, Trash2, Check, FileText } from "lucide-react";
+import { QUOTE_FIELD_DEFS, type QuoteFieldSettings } from "@/lib/quoteFields";
 
 interface CompanyForm {
   name: string;
@@ -10,6 +11,11 @@ interface CompanyForm {
   phone: string;
   industry: string;
   employeeCount: string;
+  email: string;
+  bankInfo: string;
+  invoiceRegNumber: string;
+  defaultValidityDays: string;
+  defaultPaymentTerms: string;
 }
 
 type Tab = "company" | "quote";
@@ -50,11 +56,13 @@ export default function SettingsView({
   initial,
   initialLogoUrl,
   initialShowLogoOnQuote,
+  initialFieldSettings,
 }: {
   companyCode: string;
   initial: CompanyForm;
   initialLogoUrl: string | null;
   initialShowLogoOnQuote: boolean;
+  initialFieldSettings: QuoteFieldSettings;
 }) {
   const [tab, setTab] = useState<Tab>("company");
 
@@ -70,6 +78,9 @@ export default function SettingsView({
   const [showLogo, setShowLogo] = useState(initialShowLogoOnQuote);
   const [showLogoSaving, setShowLogoSaving] = useState(false);
   const [showLogoError, setShowLogoError] = useState("");
+
+  const [fields, setFields] = useState<QuoteFieldSettings>(initialFieldSettings);
+  const [fieldsError, setFieldsError] = useState("");
 
   const updateShowLogo = async (next: boolean) => {
     setShowLogo(next);
@@ -93,6 +104,27 @@ export default function SettingsView({
     setShowLogoSaving(false);
   };
 
+  const toggleField = async (key: keyof QuoteFieldSettings) => {
+    const next = { ...fields, [key]: !fields[key] };
+    setFields(next);
+    setFieldsError("");
+    try {
+      const res = await fetch("/api/company/quote-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fieldSettings: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFields((f) => ({ ...f, [key]: !f[key] })); // revert
+        setFieldsError(data.error ?? "保存に失敗しました");
+      }
+    } catch {
+      setFields((f) => ({ ...f, [key]: !f[key] }));
+      setFieldsError("通信エラーが発生しました");
+    }
+  };
+
   const set = (k: keyof CompanyForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const saveCompany = async (e: React.FormEvent) => {
@@ -111,6 +143,11 @@ export default function SettingsView({
           phone: form.phone,
           industry: form.industry,
           employeeCount: form.employeeCount ? Number(form.employeeCount) : null,
+          email: form.email,
+          bankInfo: form.bankInfo,
+          invoiceRegNumber: form.invoiceRegNumber,
+          defaultValidityDays: form.defaultValidityDays,
+          defaultPaymentTerms: form.defaultPaymentTerms,
         }),
       });
       const data = await res.json();
@@ -218,9 +255,15 @@ export default function SettingsView({
               <input type="text" value={form.address} onChange={(e) => set("address", e.target.value)} className={field} />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">電話番号</label>
-            <input type="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} className={field} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">電話番号</label>
+              <input type="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} className={field} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">メールアドレス</label>
+              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={field} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -238,6 +281,55 @@ export default function SettingsView({
               />
             </div>
           </div>
+
+          <div className="pt-2 border-t border-slate-100">
+            <p className="text-xs font-medium text-slate-500 mb-3">見積書に載せる情報</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">インボイス登録番号</label>
+                <input
+                  type="text"
+                  value={form.invoiceRegNumber}
+                  onChange={(e) => set("invoiceRegNumber", e.target.value)}
+                  placeholder="例: T1234567890123"
+                  className={field}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">振込先</label>
+                <input
+                  type="text"
+                  value={form.bankInfo}
+                  onChange={(e) => set("bankInfo", e.target.value)}
+                  placeholder="例: 〇〇銀行 〇〇支店 普通 1234567"
+                  className={field}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">見積有効期限(日数)</label>
+                  <input
+                    type="text"
+                    value={form.defaultValidityDays}
+                    onChange={(e) => set("defaultValidityDays", e.target.value)}
+                    placeholder="例: 30"
+                    className={field}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">支払条件</label>
+                  <input
+                    type="text"
+                    value={form.defaultPaymentTerms}
+                    onChange={(e) => set("defaultPaymentTerms", e.target.value)}
+                    placeholder="例: 月末締め翌月末払い"
+                    className={field}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
           <button
             type="submit"
@@ -328,6 +420,36 @@ export default function SettingsView({
           </p>
         )}
         {showLogoError && <p className="text-sm text-red-500 mt-2">{showLogoError}</p>}
+
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <h3 className="font-semibold text-slate-700 text-sm mb-1">見積書に表示する項目</h3>
+          <p className="text-xs text-slate-400 mb-3">
+            オンにした項目だけが見積書に表示されます(入力・登録がある場合)。最初の見積書取り込み時にAIが自動で設定します。
+          </p>
+          <div className="divide-y divide-slate-50">
+            {QUOTE_FIELD_DEFS.map((f) => (
+              <label key={f.key} className="flex items-center justify-between gap-4 py-2.5 cursor-pointer">
+                <span className="text-sm text-slate-700">{f.label}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={fields[f.key]}
+                  onClick={() => toggleField(f.key)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                    fields[f.key] ? "bg-slate-800" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      fields[f.key] ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </label>
+            ))}
+          </div>
+          {fieldsError && <p className="text-sm text-red-500 mt-2">{fieldsError}</p>}
+        </div>
       </section>
     </div>
   );
